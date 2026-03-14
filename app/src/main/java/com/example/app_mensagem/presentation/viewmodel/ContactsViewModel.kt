@@ -1,6 +1,7 @@
 package com.example.app_mensagem.presentation.viewmodel
 
 import android.app.Application
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.app_mensagem.MyApplication
@@ -49,6 +50,23 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun importContacts() {
+        viewModelScope.launch {
+            _uiState.value = ContactsUiState.Loading
+            try {
+                // Aqui o app lê os contatos do aparelho
+                val deviceContacts = repository.importDeviceContacts()
+                // Em um app real, compararíamos números/emails com o Firebase.
+                // Para este projeto, vamos apenas recarregar os usuários do Firebase
+                // simulando que novos contatos foram encontrados.
+                loadUsers()
+                Toast.makeText(getApplication(), "${deviceContacts.size} contatos lidos da agenda.", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                _uiState.value = ContactsUiState.Error("Erro ao acessar agenda: ${e.message}")
+            }
+        }
+    }
+
     fun onUserClicked(user: User) {
         viewModelScope.launch {
             try {
@@ -60,7 +78,6 @@ class ContactsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    // **** FUNÇÃO FALTANTE ADICIONADA AQUI ****
     fun createGroup(name: String, memberIds: List<String>) {
         viewModelScope.launch {
             try {

@@ -1,5 +1,7 @@
 package com.example.app_mensagem.data
 
+import android.net.Uri
+import android.util.Log
 import com.example.app_mensagem.data.model.User
 import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FirebaseAuth
@@ -18,17 +20,38 @@ class AuthRepository {
         return result
     }
 
-    suspend fun createUser(email: String, pass: String): AuthResult {
+    suspend fun createUser(email: String, pass: String, name: String, status: String, imageUri: Uri?): AuthResult {
         val authResult = auth.createUserWithEmailAndPassword(email, pass).await()
         val firebaseUser = authResult.user
+        
         if (firebaseUser != null) {
-            val token = FirebaseMessaging.getInstance().token.await()
+            var imageUrl: String? = null
+            
+            if (imageUri != null) {
+                try {
+                    Log.d("AuthRepository", "Iniciando upload para Cloudinary...")
+                    imageUrl = CloudinaryHelper.uploadImage(imageUri)
+                    Log.d("AuthRepository", "Upload concluído! URL: $imageUrl")
+                } catch (e: Exception) {
+                    Log.e("AuthRepository", "FALHA NO UPLOAD: ${e.message}")
+                }
+            }
+
+            val token = try {
+                FirebaseMessaging.getInstance().token.await()
+            } catch (e: Exception) {
+                ""
+            }
+
             val user = User(
                 uid = firebaseUser.uid,
-                name = email.substringBefore('@'),
+                name = name.ifBlank { email.substringBefore('@') },
                 email = email,
-                fcmToken = token
+                fcmToken = token,
+                status = status,
+                profilePictureUrl = imageUrl
             )
+            
             database.getReference("users").child(firebaseUser.uid).setValue(user).await()
         }
         return authResult
@@ -44,7 +67,6 @@ class AuthRepository {
             val token = FirebaseMessaging.getInstance().token.await()
             database.getReference("users").child(userId).child("fcmToken").setValue(token)
         } catch (e: Exception) {
-            // Lidar com a falha ao obter o token, se necessário
         }
     }
 }

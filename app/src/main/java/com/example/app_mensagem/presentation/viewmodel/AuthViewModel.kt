@@ -1,6 +1,7 @@
 package com.example.app_mensagem.presentation.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.app_mensagem.MyApplication
@@ -41,7 +42,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = AuthUiState.Loading
             try {
                 val result = authRepository.loginUser(email, pass)
-                // **** CHAMA A SINCRONIZAÇÃO ATIVA AQUI ****
                 chatRepository.syncUserConversations()
                 _uiState.value = AuthUiState.Success(result.user?.uid ?: "")
             } catch (e: Exception) {
@@ -50,11 +50,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun signUp(email: String, pass: String) {
+    fun signUp(email: String, pass: String, name: String, status: String, imageUri: Uri?) {
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
             try {
-                val result = authRepository.createUser(email, pass)
+                val result = authRepository.createUser(email, pass, name, status, imageUri)
                 _uiState.value = AuthUiState.Success(result.user?.uid ?: "")
             } catch (e: Exception) {
                 _uiState.value = AuthUiState.Error(e.message ?: "Ocorreu um erro ao criar a conta.")

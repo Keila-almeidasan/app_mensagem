@@ -1,5 +1,9 @@
 package com.example.app_mensagem.presentation.contacts
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,9 +20,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
@@ -41,6 +47,16 @@ fun ContactsScreen(
     val contactsState by contactsViewModel.uiState.collectAsState()
     val navigationState by contactsViewModel.navigationState.collectAsState()
     val selectedUsers = remember { mutableStateListOf<User>() }
+    val context = LocalContext.current
+
+    // Launcher para pedir permissão de contatos
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            contactsViewModel.importContacts()
+        }
+    }
 
     LaunchedEffect(navigationState) {
         if (navigationState is ContactNavigationState.NavigateToChat) {
@@ -90,12 +106,21 @@ fun ContactsScreen(
                 is ContactsUiState.Success -> {
                     Column(modifier = Modifier.fillMaxSize()) {
                         TextButton(
-                            onClick = { /* Lógica de importar contatos virá aqui */ },
+                            onClick = {
+                                when (PackageManager.PERMISSION_GRANTED) {
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) -> {
+                                        contactsViewModel.importContacts()
+                                    }
+                                    else -> {
+                                        permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                                    }
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth().padding(8.dp)
                         ) {
                             Text("Importar da Agenda do Celular")
                         }
-                        Divider()
+                        HorizontalDivider()
                         LazyColumn(modifier = Modifier.weight(1f)) {
                             items(state.users) { user ->
                                 val isSelected = selectedUsers.any { it.uid == user.uid }

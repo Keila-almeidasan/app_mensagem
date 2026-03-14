@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "975435292947",
-    "project_id": "appmensagensmaster",
-    "storage_bucket": "appmensagensmaster.firebasestorage.app"
+    "project_number": "105118131812",
+    "project_id": "app-mensagem-keila",
+    "storage_bucket": "app-mensagem-keila.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:975435292947:android:538bece1027019a697fae6",
+        "mobilesdk_app_id": "1:105118131812:android:344c92bb4ca001d8266171",
         "android_client_info": {
           "package_name": "com.example.app_mensagem"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBQVr7pIou-mRI8IE7iUbyDKY4IL1bFXKk"
+          "current_key": "AIzaSyD5MrTH2LduDnqqziX3Pu3VTeWxSGq3sBo"
         }
       ],
       "services": {

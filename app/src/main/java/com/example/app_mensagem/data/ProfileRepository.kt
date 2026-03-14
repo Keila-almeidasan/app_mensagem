@@ -1,18 +1,17 @@
 package com.example.app_mensagem.data
 
 import android.net.Uri
+import android.util.Log
 import com.example.app_mensagem.data.model.Conversation
 import com.example.app_mensagem.data.model.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 
 class ProfileRepository {
 
     private val auth = FirebaseAuth.getInstance()
     private val database = FirebaseDatabase.getInstance()
-    private val storage = FirebaseStorage.getInstance()
 
     suspend fun getUserProfile(): User? {
         val userId = auth.currentUser?.uid ?: return null
@@ -25,15 +24,19 @@ class ProfileRepository {
         val userRef = database.getReference("users").child(userId)
         var imageUrl: String? = null
 
+        // Agora usando CloudinaryHelper para o Perfil também!
         if (imageUri != null) {
-            val storageRef = storage.getReference("profile_pictures/$userId")
-            storageRef.putFile(imageUri).await()
-            imageUrl = storageRef.downloadUrl.await().toString()
+            try {
+                imageUrl = CloudinaryHelper.uploadImage(imageUri)
+            } catch (e: Exception) {
+                Log.e("ProfileRepository", "Erro no upload Cloudinary: ${e.message}")
+            }
         }
 
         val updates = mutableMapOf<String, Any?>()
         updates["name"] = name
         updates["status"] = status
+        
         if (imageUrl != null) {
             updates["profilePictureUrl"] = imageUrl
         }
@@ -47,13 +50,14 @@ class ProfileRepository {
     }
 
     private suspend fun propagateProfileUpdates(updatedUser: User) {
-        val currentUserConversationsRef = database.getReference("user-conversations").child(updatedUser.uid)
-        val snapshot = currentUserConversationsRef.get().await()
+        val userId = updatedUser.uid
+        val currentUserConversationsRef = database.getReference("user-conversations").child(userId)
+        val snapshot = try { currentUserConversationsRef.get().await() } catch (e: Exception) { null }
 
-        snapshot.children.forEach { conversationSnapshot ->
+        snapshot?.children?.forEach { conversationSnapshot ->
             val conversation = conversationSnapshot.getValue(Conversation::class.java)
             if (conversation != null && !conversation.isGroup) {
-                val otherUserId = conversation.id.replace(updatedUser.uid, "").replace("-", "")
+                val otherUserId = conversation.id.replace(userId, "").replace("-", "")
 
                 val otherUserConversationRef = database.getReference("user-conversations")
                     .child(otherUserId)
@@ -63,7 +67,7 @@ class ProfileRepository {
                     "name" to updatedUser.name,
                     "profilePictureUrl" to updatedUser.profilePictureUrl
                 )
-                otherUserConversationRef.updateChildren(updates).await()
+                otherUserConversationRef.updateChildren(updates)
             }
         }
     }

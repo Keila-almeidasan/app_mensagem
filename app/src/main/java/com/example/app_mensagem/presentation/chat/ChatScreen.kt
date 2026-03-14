@@ -1,29 +1,14 @@
 package com.example.app_mensagem.presentation.chat
 
-import android.content.Intent
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.DrawableRes
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,65 +17,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import coil.compose.rememberAsyncImagePainter
 import com.example.app_mensagem.R
 import com.example.app_mensagem.data.model.Message
-import com.example.app_mensagem.data.model.User
 import com.example.app_mensagem.presentation.viewmodel.ChatViewModel
-import com.example.app_mensagem.ui.theme.App_mensagemTheme
+import com.example.app_mensagem.ui.theme.chatGradient
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.regex.Pattern
-import android.util.Log
+import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(navController: NavController, conversationId: String?) {
     val chatViewModel: ChatViewModel = viewModel()
     val uiState by chatViewModel.uiState.collectAsState()
-    var text by remember { mutableStateOf("") }
+    var messageText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
-    var selectedMessageId by remember { mutableStateOf<String?>(null) }
-    var isSearchActive by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState()
-    var showStickerSheet by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-        onResult = { uri -> chatViewModel.onMediaSelected(uri, "IMAGE") }
-    )
-
-    val videoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-        onResult = { uri -> chatViewModel.onMediaSelected(uri, "VIDEO") }
-    )
-    
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview(),
-        onResult = { bitmap -> 
-            // Salvar bitmap em arquivo temporário e enviar
-            // Para simplificar aqui, vamos apenas indicar a necessidade de um URI
-        }
-    )
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
 
     LaunchedEffect(conversationId) {
         if (conversationId != null) {
@@ -98,154 +46,193 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            val isGroup = uiState.conversation?.isGroup ?: false
-            TopAppBar(
-                title = {
-                    if (isSearchActive) {
-                        TextField(
-                            value = uiState.searchQuery,
-                            onValueChange = { chatViewModel.onSearchQueryChanged(it) },
-                            placeholder = { Text("Buscar na conversa...") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                cursorColor = MaterialTheme.colorScheme.onPrimary,
-                                focusedTextColor = MaterialTheme.colorScheme.onPrimary
-                            ),
-                            textStyle = LocalTextStyle.current.copy(color = MaterialTheme.colorScheme.onPrimary)
+    LaunchedEffect(uiState.messages.size) {
+        if (uiState.messages.isNotEmpty()) {
+            listState.animateScrollToItem(uiState.messages.size - 1)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF8FAFC)) // Fundo claro do Figma
+    ) {
+        // --- CABEÇALHO DO FIGMA ---
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            tonalElevation = 4.dp,
+            color = Color.White
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Color(0xFF1E293B))
+                    }
+                    
+                    AsyncImage(
+                        model = uiState.conversation?.profilePictureUrl ?: R.drawable.ic_launcher_foreground,
+                        contentDescription = "Avatar",
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE2E8F0)),
+                        contentScale = ContentScale.Crop
+                    )
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    Column {
+                        Text(
+                            uiState.conversationTitle, 
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            color = Color(0xFF1E293B)
                         )
-                    } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable(enabled = isGroup) {
-                                if (conversationId != null) {
-                                    navController.navigate("group_info/$conversationId")
-                                }
-                            }
-                        ) {
-                            AsyncImage(
-                                model = uiState.conversation?.profilePictureUrl ?: R.drawable.ic_launcher_foreground,
-                                contentDescription = "Foto de Perfil de ${uiState.conversationTitle}",
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(uiState.conversationTitle)
-                        }
-                    }
-                },
-                navigationIcon = {
-                    if (isSearchActive) {
-                        IconButton(onClick = {
-                            isSearchActive = false
-                            chatViewModel.onSearchQueryChanged("")
-                        }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Fechar Busca", tint = MaterialTheme.colorScheme.onPrimary)
-                        }
-                    } else {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = MaterialTheme.colorScheme.onPrimary)
-                        }
-                    }
-                },
-                actions = {
-                    if (!isSearchActive) {
-                        IconButton(onClick = { isSearchActive = true }) {
-                            Icon(Icons.Default.Search, contentDescription = "Buscar Mensagem", tint = MaterialTheme.colorScheme.onPrimary)
-                        }
-                        IconButton(onClick = { 
-                            if (conversationId != null) chatViewModel.sendLocation(conversationId) 
-                        }) {
-                            Icon(Icons.Default.LocationOn, contentDescription = "Enviar Localização", tint = MaterialTheme.colorScheme.onPrimary)
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        },
-        bottomBar = {
-            Column {
-                AnimatedVisibility(visible = uiState.mediaToSendUri != null) {
-                    Box(modifier = Modifier
-                        .padding(start = 8.dp, end = 8.dp, bottom = 4.dp)
-                        .height(80.dp)
-                        .width(80.dp)
-                    ) {
-                        Image(
-                            painter = rememberAsyncImagePainter(uiState.mediaToSendUri),
-                            contentDescription = "Mídia selecionada",
-                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
+                        Text(
+                            if (uiState.conversation?.isGroup == true) "Grupo" else "Online", 
+                            fontSize = 12.sp, 
+                            color = Color(0xFF10B981)
                         )
-                        IconButton(
-                            onClick = { chatViewModel.onMediaSelected(null, "") },
-                            modifier = Modifier.align(Alignment.TopEnd).background(Color.Black.copy(alpha = 0.5f), CircleShape).size(24.dp)
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = "Remover mídia", tint = Color.White, modifier = Modifier.size(16.dp))
-                        }
                     }
                 }
-                Row(
+
+                Row {
+                    IconButton(onClick = {}) { Icon(Icons.Default.Phone, null, tint = Color(0xFF64748B)) }
+                    IconButton(onClick = {}) { Icon(Icons.Default.VideoCall, null, tint = Color(0xFF64748B)) }
+                }
+            }
+        }
+
+        // --- LISTA DE MENSAGENS ---
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(uiState.messages) { message ->
+                val isMine = message.senderId == currentUserId
+                MessageBubbleDesign(message, isMine)
+            }
+        }
+
+        // --- BARRA DE DIGITAÇÃO DO FIGMA ---
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding(),
+            tonalElevation = 8.dp,
+            color = Color.White
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = {}) {
+                    Icon(Icons.Default.Add, null, tint = Color(0xFF64748B))
+                }
+                
+                OutlinedTextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { imagePickerLauncher.launch("image/*") }) {
-                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Anexar Imagem")
+                        .weight(1f)
+                        .padding(horizontal = 8.dp),
+                    placeholder = { Text("Digite sua mensagem...", color = Color(0xFF94A3B8)) },
+                    shape = RoundedCornerShape(24.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedContainerColor = Color(0xFFF1F5F9),
+                        unfocusedContainerColor = Color(0xFFF1F5F9),
+                        focusedTextColor = Color.Black,
+                        unfocusedTextColor = Color.Black
+                    ),
+                    maxLines = 4
+                )
+                
+                if (messageText.isNotBlank()) {
+                    IconButton(
+                        onClick = {
+                            if (conversationId != null) {
+                                chatViewModel.sendMessage(conversationId, messageText)
+                                messageText = ""
+                            }
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(chatGradient, CircleShape)
+                    ) {
+                        Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(22.dp))
                     }
-                    IconButton(onClick = { cameraLauncher.launch(null) }) {
-                        Icon(Icons.Default.PhotoCamera, contentDescription = "Tirar Foto")
-                    }
-                    IconButton(onClick = { 
-                        if (uiState.isRecording) {
-                            if (conversationId != null) chatViewModel.stopRecording(conversationId)
-                        } else {
-                            chatViewModel.startRecording()
-                        }
-                    }) {
-                        Icon(
-                            if (uiState.isRecording) Icons.Default.StopCircle else Icons.Default.Mic, 
-                            contentDescription = "Gravar Áudio",
-                            tint = if (uiState.isRecording) Color.Red else MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    OutlinedTextField(
-                        value = text,
-                        onValueChange = { text = it },
-                        modifier = Modifier.weight(1f),
-                        placeholder = { Text(if (uiState.isRecording) "Gravando..." else "Digite uma mensagem...") },
-                        enabled = uiState.mediaToSendUri == null && !uiState.isRecording
-                    )
-                    IconButton(onClick = {
-                        if (conversationId != null) {
-                            chatViewModel.sendMessage(conversationId, text)
-                            text = ""
-                        }
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Enviar")
+                } else {
+                    IconButton(onClick = {}) {
+                        Icon(Icons.Default.Mic, null, tint = Color(0xFF64748B))
                     }
                 }
             }
         }
-    ) { paddingValues ->
-        // ... (Resto do corpo da ChatScreen permanece igual, exibindo as bolhas)
-        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            // Reaproveitar lógica de exibição de mensagens já existente no arquivo original...
-            // (Para brevidade, assuma a manutenção do LazyColumn aqui)
-        }
     }
 }
 
-// ... (Resto do arquivo com MessageBubble, HighlightingText, etc.)
+@Composable
+fun MessageBubbleDesign(message: Message, isMine: Boolean) {
+    val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val timeString = timeFormat.format(Date(message.timestamp))
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
+    ) {
+        Surface(
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 16.dp,
+                bottomStart = if (isMine) 16.dp else 2.dp,
+                bottomEnd = if (isMine) 2.dp else 16.dp
+            ),
+            color = if (isMine) Color(0xFF9333EA) else Color.White, // Roxo do Figma para mim
+            tonalElevation = if (isMine) 0.dp else 2.dp,
+            modifier = Modifier.widthIn(max = 280.dp)
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Text(
+                    message.content,
+                    color = if (isMine) Color.White else Color(0xFF1E293B),
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp
+                )
+                Row(
+                    modifier = Modifier.align(Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        timeString,
+                        fontSize = 10.sp,
+                        color = if (isMine) Color.White.copy(0.7f) else Color(0xFF94A3B8)
+                    )
+                    if (isMine) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = if (message.readTimestamp > 0) Icons.Default.DoneAll else Icons.Default.Done,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = if (message.readTimestamp > 0) Color(0xFF38BDF8) else Color.White.copy(0.7f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

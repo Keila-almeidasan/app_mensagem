@@ -22,13 +22,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.app_mensagem.presentation.auth.ForgotPasswordScreen
+import com.example.app_mensagem.presentation.auth.HomeScreen
 import com.example.app_mensagem.presentation.auth.LoginScreen
 import com.example.app_mensagem.presentation.auth.SignUpScreen
 import com.example.app_mensagem.presentation.chat.ChatScreen
 import com.example.app_mensagem.presentation.contacts.ContactsScreen
 import com.example.app_mensagem.presentation.group.CreateGroupScreen
 import com.example.app_mensagem.presentation.group.GroupInfoScreen
-import com.example.app_mensagem.presentation.home.HomeScreen
 import com.example.app_mensagem.presentation.profile.ProfileScreen
 import com.example.app_mensagem.presentation.viewmodel.*
 import com.example.app_mensagem.ui.theme.App_mensagemTheme
@@ -55,8 +55,6 @@ class MainActivity : ComponentActivity() {
             intent.removeExtra("conversationId")
         }
     }
-
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

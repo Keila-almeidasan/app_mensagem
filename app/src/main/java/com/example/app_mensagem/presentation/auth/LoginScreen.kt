@@ -1,26 +1,29 @@
 package com.example.app_mensagem.presentation.auth
 
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChatBubble
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.app_mensagem.presentation.viewmodel.AuthUiState
 import com.example.app_mensagem.presentation.viewmodel.AuthViewModel
-import com.example.app_mensagem.ui.theme.App_mensagemTheme
+import com.example.app_mensagem.ui.theme.Purple600
+import com.example.app_mensagem.ui.theme.loginGradient
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(navController: NavController, viewModel: AuthViewModel) {
     var email by remember { mutableStateOf("") }
@@ -38,94 +41,205 @@ fun LoginScreen(navController: NavController, viewModel: AuthViewModel) {
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(loginGradient)
+    ) {
+        // Círculos animados de fundo
+        Box(
+            modifier = Modifier
+                .offset(x = 80.dp, y = 80.dp)
+                .size(288.dp)
+                .background(
+                    Color.White.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(percent = 50)
+                )
+                .blur(60.dp)
+        )
+        
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .offset(x = (-80).dp, y = (-80).dp)
+                .size(384.dp)
+                .background(
+                    Color.White.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(percent = 50)
+                )
+                .blur(60.dp)
+        )
+
+        // Card de Login
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.ChatBubble,
-                contentDescription = "App Logo",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .size(100.dp)
-                    .padding(bottom = 16.dp)
-            )
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Email") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Senha") },
-                singleLine = true,
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(imageVector = image, contentDescription = if (passwordVisible) "Ocultar senha" else "Mostrar senha")
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Button(
-                onClick = { viewModel.login(email, password) },
-                enabled = authState != AuthUiState.Loading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
+            // Ícone
+            Surface(
+                modifier = Modifier.size(80.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White.copy(alpha = 0.2f)
             ) {
-                if (authState is AuthUiState.Loading) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(24.dp)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = Color.White
                     )
-                } else {
-                    Text("Entrar")
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
 
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Título
             Text(
-                text = "Não tem uma conta? Cadastre-se",
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable {
+                text = "Bem-vindo de volta",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            
+            Text(
+                text = "Entre para continuar sua jornada",
+                fontSize = 16.sp,
+                color = Color.White.copy(alpha = 0.8f)
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Card com formulário
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                color = Color.White.copy(alpha = 0.1f)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
+                ) {
+                    // Campo Email
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("E-mail", color = Color.White.copy(0.8f)) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Email, null, tint = Color.White.copy(0.6f))
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color.White.copy(0.4f),
+                            unfocusedBorderColor = Color.White.copy(0.2f),
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Campo Senha
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Senha", color = Color.White.copy(0.8f)) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Lock, null, tint = Color.White.copy(0.6f))
+                        },
+                        trailingIcon = {
+                            val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(imageVector = image, contentDescription = null, tint = Color.White.copy(0.6f))
+                            }
+                        },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color.White.copy(0.4f),
+                            unfocusedBorderColor = Color.White.copy(0.2f),
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Esqueci a senha
+                    TextButton(
+                        onClick = { 
+                            navController.navigate("forgot_password")
+                            viewModel.resetState()
+                        },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Esqueceu a senha?", color = Color.White.copy(0.8f))
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Botão Entrar
+                    Button(
+                        onClick = { viewModel.login(email, password) },
+                        enabled = authState != AuthUiState.Loading,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White
+                        )
+                    ) {
+                        if (authState is AuthUiState.Loading) {
+                            CircularProgressIndicator(color = Purple600, modifier = Modifier.size(24.dp))
+                        } else {
+                            Text(
+                                "Entrar",
+                                color = Purple600,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(
+                                Icons.Default.ArrowForward,
+                                null,
+                                tint = Purple600
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Link para cadastro
+            Row {
+                Text("Não tem uma conta? ", color = Color.White.copy(0.8f))
+                TextButton(onClick = {
                     navController.navigate("signup")
                     viewModel.resetState()
+                }) {
+                    Text("Cadastre-se", color = Color.White, fontWeight = FontWeight.SemiBold)
                 }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Esqueceu a senha?",
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable {
-                    navController.navigate("forgot_password")
-                    viewModel.resetState()
-                }
-            )
-
+            }
+            
             if (authState is AuthUiState.Error) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = (authState as AuthUiState.Error).message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.background(Color.Red.copy(0.5f), RoundedCornerShape(8.dp)).padding(8.dp)
                 )
             }
         }

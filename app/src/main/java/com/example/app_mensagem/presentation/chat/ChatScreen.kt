@@ -8,8 +8,10 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -33,6 +35,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -49,7 +52,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ChatScreen(navController: NavController, conversationId: String?) {
     val chatViewModel: ChatViewModel = viewModel()
@@ -63,7 +66,6 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
     var showAttachmentMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // Estado para Visualização em Tela Cheia
     var fullscreenImageUrl by remember { mutableStateOf<String?>(null) }
 
     val emojis = listOf("😀", "😂", "😍", "🤣", "😊", "🙏", "👍", "❤️", "🔥", "✨", "🚀", "🎉", "😎", "🤔", "😢", "🙌", "👏", "✔️")
@@ -176,6 +178,38 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                 }
             }
 
+            // --- BARRA DE MENSAGEM FIXADA ---
+            if (uiState.pinnedMessage != null) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clickable { },
+                    color = Color.White,
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.PushPin, null, tint = Color(0xFF9333EA), modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Mensagem Fixada", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF9333EA))
+                            Text(
+                                text = uiState.pinnedMessage?.content ?: "",
+                                fontSize = 14.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = Color.Gray
+                            )
+                        }
+                        IconButton(onClick = { 
+                            if (conversationId != null) chatViewModel.onPinMessageClick(conversationId, uiState.pinnedMessage!!) 
+                        }) {
+                            Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+
             // --- MENSAGENS ---
             LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(uiState.messages) { message ->
@@ -183,7 +217,10 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                     MessageBubbleDesign(
                         message = message, 
                         isMine = isMine,
-                        onImageClick = { url -> fullscreenImageUrl = url }
+                        onImageClick = { url -> fullscreenImageUrl = url },
+                        onPinClick = { 
+                            if (conversationId != null) chatViewModel.onPinMessageClick(conversationId, it) 
+                        }
                     )
                 }
             }
@@ -205,9 +242,13 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
                         } else {
                             LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxSize().padding(8.dp)) {
                                 items(stickerUrls) { url ->
-                                    AsyncImage(model = url, contentDescription = null, modifier = Modifier.size(80.dp).padding(8.dp).clickable {
-                                        if (conversationId != null) { chatViewModel.sendSticker(conversationId, url); showEmojiPicker = false }
-                                    })
+                                    AsyncImage(
+                                        model = url, 
+                                        contentDescription = null, 
+                                        modifier = Modifier.size(80.dp).padding(8.dp).clickable {
+                                            if (conversationId != null) { chatViewModel.sendSticker(conversationId, url); showEmojiPicker = false }
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -284,26 +325,11 @@ fun ChatScreen(navController: NavController, conversationId: String?) {
             }
         }
 
-        // --- OVERLAY DE TELA CHEIA (IMAGE VIEWER) ---
         if (fullscreenImageUrl != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black)
-                    .clickable { fullscreenImageUrl = null },
-                contentAlignment = Alignment.Center
-            ) {
-                AsyncImage(
-                    model = fullscreenImageUrl,
-                    contentDescription = "Imagem ampliada",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-                IconButton(
-                    onClick = { fullscreenImageUrl = null },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(16.dp).statusBarsPadding()
-                ) {
-                    Icon(Icons.Default.Close, "Fechar", tint = Color.White, modifier = Modifier.size(32.dp))
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black).clickable { fullscreenImageUrl = null }, contentAlignment = Alignment.Center) {
+                AsyncImage(model = fullscreenImageUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                IconButton(onClick = { fullscreenImageUrl = null }, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp).statusBarsPadding()) {
+                    Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(32.dp))
                 }
             }
         }
@@ -320,62 +346,90 @@ fun AttachmentOption(icon: androidx.compose.ui.graphics.vector.ImageVector, labe
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MessageBubbleDesign(message: Message, isMine: Boolean, onImageClick: (String) -> Unit) {
+fun MessageBubbleDesign(
+    message: Message, 
+    isMine: Boolean, 
+    onImageClick: (String) -> Unit,
+    onPinClick: (Message) -> Unit
+) {
     val context = LocalContext.current
     val timeString = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp))
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start) {
-        Surface(
-            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = if (isMine) 16.dp else 2.dp, bottomEnd = if (isMine) 2.dp else 16.dp),
-            color = if (isMine) Color(0xFF9333EA) else Color.White,
-            tonalElevation = 2.dp,
-            modifier = Modifier.widthIn(max = 280.dp)
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                when (message.type) {
-                    "IMAGE", "STICKER" -> {
-                        AsyncImage(
-                            model = message.content, 
-                            contentDescription = null, 
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 250.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { onImageClick(message.content) },
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-                    "VIDEO" -> {
-                        Box(contentAlignment = Alignment.Center) {
-                            AsyncImage(model = message.content, contentDescription = null, modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
-                            Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.size(48.dp).clickable {
-                                val intent = Intent(Intent.ACTION_VIEW).apply { setDataAndType(Uri.parse(message.content), "video/*") }
+    var showMessageMenu by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
+    ) {
+        Box {
+            Surface(
+                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = if (isMine) 16.dp else 2.dp, bottomEnd = if (isMine) 2.dp else 16.dp),
+                color = if (isMine) Color(0xFF9333EA) else Color.White,
+                tonalElevation = 2.dp,
+                modifier = Modifier
+                    .widthIn(max = 280.dp)
+                    .combinedClickable(
+                        onClick = { if (message.type == "IMAGE") onImageClick(message.content) },
+                        onLongClick = { showMessageMenu = true }
+                    )
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    when (message.type) {
+                        "IMAGE", "STICKER" -> {
+                            AsyncImage(model = message.content, contentDescription = null, modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                        }
+                        "VIDEO" -> {
+                            Box(contentAlignment = Alignment.Center) {
+                                AsyncImage(model = message.content, contentDescription = null, modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                                Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.size(48.dp).clickable {
+                                    val intent = Intent(Intent.ACTION_VIEW).apply { setDataAndType(Uri.parse(message.content), "video/*") }
+                                    context.startActivity(intent)
+                                })
+                            }
+                        }
+                        "AUDIO" -> {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
+                                val intent = Intent(Intent.ACTION_VIEW).apply { setDataAndType(Uri.parse(message.content), "audio/*") }
                                 context.startActivity(intent)
+                            }) {
+                                Icon(Icons.Default.PlayArrow, null, tint = if (isMine) Color.White else Color.Black)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Mensagem de voz", color = if (isMine) Color.White else Color.Black)
+                            }
+                        }
+                        "LOCATION" -> {
+                            Text("📍 Minha Localização", color = if (isMine) Color.White else Color.Blue, modifier = Modifier.clickable {
+                                val gmmIntentUri = Uri.parse(message.content)
+                                val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
+                                context.startActivity(mapIntent)
                             })
                         }
-                    }
-                    "AUDIO" -> {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable {
-                            val intent = Intent(Intent.ACTION_VIEW).apply { setDataAndType(Uri.parse(message.content), "audio/*") }
-                            context.startActivity(intent)
-                        }) {
-                            Icon(Icons.Default.PlayArrow, null, tint = if (isMine) Color.White else Color.Black)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Mensagem de voz", color = if (isMine) Color.White else Color.Black)
+                        else -> {
+                            Text(message.content, color = if (isMine) Color.White else Color(0xFF1E293B), fontSize = 15.sp)
                         }
                     }
-                    "LOCATION" -> {
-                        Text("📍 Minha Localização", color = if (isMine) Color.White else Color.Blue, modifier = Modifier.clickable {
-                            val gmmIntentUri = Uri.parse(message.content)
-                            val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
-                            context.startActivity(mapIntent)
-                        })
-                    }
-                    else -> {
-                        Text(message.content, color = if (isMine) Color.White else Color(0xFF1E293B), fontSize = 15.sp)
-                    }
+                    Text(timeString, fontSize = 10.sp, color = if (isMine) Color.White.copy(0.7f) else Color(0xFF94A3B8), modifier = Modifier.align(Alignment.End))
                 }
-                Text(timeString, fontSize = 10.sp, color = if (isMine) Color.White.copy(0.7f) else Color(0xFF94A3B8), modifier = Modifier.align(Alignment.End))
+            }
+
+            DropdownMenu(
+                expanded = showMessageMenu,
+                onDismissRequest = { showMessageMenu = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Fixar Mensagem") },
+                    leadingIcon = { Icon(Icons.Default.PushPin, null) },
+                    onClick = {
+                        onPinClick(message)
+                        showMessageMenu = false
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Reagir") },
+                    leadingIcon = { Icon(Icons.Default.AddReaction, null) },
+                    onClick = { showMessageMenu = false }
+                )
             }
         }
     }

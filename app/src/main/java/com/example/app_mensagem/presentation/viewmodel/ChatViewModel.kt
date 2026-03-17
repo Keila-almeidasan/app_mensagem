@@ -98,9 +98,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
+            val pinnedMessage = if (conversation.pinnedMessageId != null) {
+                repository.getMessageById(conversationId, conversation.pinnedMessageId, conversation.isGroup)
+            } else {
+                null
+            }
+
             _uiState.value = _uiState.value.copy(
                 conversationTitle = conversation.name,
-                conversation = conversation
+                conversation = conversation,
+                pinnedMessage = pinnedMessage
             )
 
             repository.getMessagesForConversation(conversationId, conversation.isGroup)
@@ -108,6 +115,25 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 .collect { messages ->
                     _uiState.value = _uiState.value.copy(messages = messages, isLoading = false)
                 }
+        }
+    }
+
+    fun onPinMessageClick(conversationId: String, message: Message) {
+        viewModelScope.launch {
+            try {
+                val isGroup = _uiState.value.conversation?.isGroup ?: false
+                repository.togglePinMessage(conversationId, message, isGroup)
+                // Recarrega detalhes para atualizar a mensagem fixada na UI
+                val conversation = repository.getConversationDetails(conversationId)
+                val pinnedMessage = if (conversation?.pinnedMessageId != null) {
+                    repository.getMessageById(conversationId, conversation.pinnedMessageId, conversation.isGroup)
+                } else {
+                    null
+                }
+                _uiState.value = _uiState.value.copy(pinnedMessage = pinnedMessage)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.message ?: "Falha ao fixar mensagem")
+            }
         }
     }
 
@@ -146,6 +172,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun sendSticker(conversationId: String, stickerId: String) {
+        viewModelScope.launch {
+            try { repository.sendStickerMessage(conversationId, stickerId, _uiState.value.conversation?.isGroup ?: false) }
+            catch (e: Exception) { _uiState.value = _uiState.value.copy(error = e.message) }
+        }
+    }
+
     fun startRecording() {
         try {
             audioFile = File(getApplication<Application>().cacheDir, "audio_record_${System.currentTimeMillis()}.m4a")
@@ -179,13 +212,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
         } catch (e: Exception) {
             Log.e("ChatViewModel", "Erro ao parar gravação", e)
-        }
-    }
-
-    fun sendSticker(conversationId: String, stickerId: String) {
-        viewModelScope.launch {
-            try { repository.sendStickerMessage(conversationId, stickerId, _uiState.value.conversation?.isGroup ?: false) }
-            catch (e: Exception) { _uiState.value = _uiState.value.copy(error = e.message) }
         }
     }
 

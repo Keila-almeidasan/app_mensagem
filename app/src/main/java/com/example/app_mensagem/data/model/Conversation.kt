@@ -10,6 +10,7 @@ data class Conversation(
     val name: String = "",
     val profilePictureUrl: String? = null,
     val lastMessage: String = "",
+    val lastSenderId: String = "",
     val timestamp: Long = 0L,
     val pinnedMessageId: String? = null,
 

@@ -1,5 +1,9 @@
 package com.example.app_mensagem.presentation.auth
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -30,7 +34,6 @@ import com.example.app_mensagem.presentation.common.LifecycleObserver
 import com.example.app_mensagem.presentation.viewmodel.AuthViewModel
 import com.example.app_mensagem.presentation.viewmodel.ConversationUiState
 import com.example.app_mensagem.presentation.viewmodel.ConversationsViewModel
-import com.example.app_mensagem.ui.theme.chatGradient
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -43,6 +46,17 @@ fun HomeScreen(
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val conversationState by conversationsViewModel.uiState.collectAsState()
+
+    // Pedir permissão de notificação (Android 13+)
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     LifecycleObserver { event ->
         if (event == Lifecycle.Event.ON_RESUME) {
@@ -76,8 +90,9 @@ fun HomeScreen(
                         IconButton(onClick = { navController.navigate("contacts") }) {
                             Icon(Icons.Default.Search, null, tint = Color(0xFF64748B))
                         }
+                        
                         Box {
-                            IconButton(onClick = { showMenu = !showMenu }) {
+                            IconButton(onClick = { showMenu = true }) {
                                 Icon(Icons.Default.MoreVert, null, tint = Color(0xFF64748B))
                             }
                             DropdownMenu(

@@ -30,9 +30,15 @@
         android:theme="@style/Theme.App_mensagem"
         tools:targetApi="31">
         
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="SUA_CHAVE_API_AQUI" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.example.app_mensagem.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <activity
             android:name="com.example.app_mensagem.MainActivity"

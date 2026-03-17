@@ -10,5 +10,8 @@ data class User(
     val email: String = "",
     val fcmToken: String = "",
     val profilePictureUrl: String? = null,
-    val status: String = ""
+    val status: String = "",
+    val blockedUsers: List<String> = emptyList(),
+    val isOnline: Boolean = false,
+    val lastSeen: Long = 0L
 )

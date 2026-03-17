@@ -13,6 +13,7 @@ import com.example.app_mensagem.data.model.Message
 import com.example.app_mensagem.data.model.User
 import com.example.app_mensagem.presentation.chat.ChatItem
 import com.google.android.gms.location.LocationServices
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,7 +37,10 @@ data class ChatUiState(
     val mediaToSendUri: Uri? = null,
     val mediaType: String? = null,
     val groupMembers: Map<String, User> = emptyMap(),
-    val isRecording: Boolean = false
+    val isRecording: Boolean = false,
+    val isUserBlocked: Boolean = false,
+    val isContactTyping: Boolean = false,
+    val contactPresence: String = "Offline"
 )
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
@@ -51,58 +55,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     init {
         val db = (application as MyApplication).database
         repository = ChatRepository(db.conversationDao(), db.messageDao(), application)
+        repository.setUserPresence()
     }
 
-    private fun groupMessagesByDate(messages: List<Message>): List<ChatItem> {
-        val items = mutableListOf<ChatItem>()
-        if (messages.isEmpty()) return items
-
-        var lastHeaderDate = ""
-        messages.forEach { message ->
-            val messageDateString = formatDateHeader(message.timestamp)
-            if (messageDateString != lastHeaderDate) {
-                items.add(ChatItem.DateHeader(messageDateString))
-                lastHeaderDate = messageDateString
-            }
-            items.add(ChatItem.MessageItem(message))
-        }
-        return items
-    }
-
-    private fun formatDateHeader(timestamp: Long): String {
-        val messageCalendar = Calendar.getInstance().apply { timeInMillis = timestamp }
-        val todayCalendar = Calendar.getInstance()
-        val yesterdayCalendar = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
-
-        return when {
-            isSameDay(messageCalendar, todayCalendar) -> "Hoje"
-            isSameDay(messageCalendar, yesterdayCalendar) -> "Ontem"
-            else -> SimpleDateFormat("dd MMMM yyyy", Locale.getDefault()).format(messageCalendar.time)
-        }
-    }
-
-    private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
-        return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-                cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
-    }
-
-    fun onMediaSelected(uri: Uri?, type: String) {
-        _uiState.value = _uiState.value.copy(mediaToSendUri = uri, mediaType = type)
-    }
-
-    fun onSearchQueryChanged(query: String) {
-        val filteredList = if (query.isBlank()) {
-            _uiState.value.messages
-        } else {
-            _uiState.value.messages.filter {
-                it.content.contains(query, ignoreCase = true) && it.type == "TEXT"
-            }
-        }
-        _uiState.value = _uiState.value.copy(
-            searchQuery = query,
-            filteredMessages = filteredList,
-            chatItems = groupMessagesByDate(filteredList)
-        )
+    fun onTyping(conversationId: String, isTyping: Boolean) {
+        repository.setTypingStatus(conversationId, isTyping)
     }
 
     fun loadMessages(conversationId: String) {
@@ -115,50 +72,41 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            var membersMap = emptyMap<String, User>()
-            if (conversation.isGroup) {
-                val members = repository.getGroupMembers(conversationId)
-                membersMap = members.associateBy { it.uid }
+            viewModelScope.launch {
+                repository.observeTypingStatus(conversationId).collect { typingUsers ->
+                    _uiState.value = _uiState.value.copy(isContactTyping = typingUsers.isNotEmpty())
+                }
             }
 
-            val pinnedMessage = if (conversation.pinnedMessageId != null) {
-                repository.getMessageById(conversationId, conversation.pinnedMessageId, conversation.isGroup)
-            } else {
-                null
+            if (!conversation.isGroup) {
+                val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+                val userIds = conversationId.split("-")
+                if (userIds.size == 2 && currentUserId != null) {
+                    val otherUserId = if (userIds[0] == currentUserId) userIds[1] else userIds[0]
+                    
+                    viewModelScope.launch {
+                        repository.observeUserPresence(otherUserId).collect { presence ->
+                            val (isOnline, lastSeen) = presence
+                            val statusText = if (isOnline) "Online" 
+                                            else "Visto por último às ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(lastSeen)}"
+                            _uiState.value = _uiState.value.copy(
+                                contactPresence = statusText,
+                                isUserBlocked = repository.isUserBlocked(currentUserId, otherUserId)
+                            )
+                        }
+                    }
+                }
             }
 
             _uiState.value = _uiState.value.copy(
                 conversationTitle = conversation.name,
-                conversation = conversation,
-                groupMembers = membersMap,
-                pinnedMessage = pinnedMessage
+                conversation = conversation
             )
 
             repository.getMessagesForConversation(conversationId, conversation.isGroup)
-                .catch { exception ->
-                    _uiState.value = _uiState.value.copy(
-                        error = exception.message ?: "Erro ao carregar mensagens",
-                        isLoading = false
-                    )
-                }
+                .catch { _uiState.value = _uiState.value.copy(error = it.message, isLoading = false) }
                 .collect { messages ->
-                    val filteredList = if (_uiState.value.searchQuery.isBlank()) {
-                        messages
-                    } else {
-                        messages.filter {
-                            it.content.contains(_uiState.value.searchQuery, ignoreCase = true) && it.type == "TEXT"
-                        }
-                    }
-                    _uiState.value = _uiState.value.copy(
-                        messages = messages,
-                        filteredMessages = filteredList,
-                        chatItems = groupMessagesByDate(filteredList),
-                        isLoading = false
-                    )
-
-                    if (!conversation.isGroup) {
-                        repository.markMessagesAsRead(conversationId, messages, conversation.isGroup)
-                    }
+                    _uiState.value = _uiState.value.copy(messages = messages, isLoading = false)
                 }
         }
     }
@@ -166,21 +114,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun sendMessage(conversationId: String, text: String) {
         viewModelScope.launch {
             val isGroup = _uiState.value.conversation?.isGroup ?: false
-            val mediaUri = _uiState.value.mediaToSendUri
-
-            try {
-                if (mediaUri != null) {
-                    val mediaType = _uiState.value.mediaType ?: "IMAGE"
-                    repository.sendMediaMessage(conversationId, mediaUri, mediaType, isGroup)
-                    _uiState.value = _uiState.value.copy(mediaToSendUri = null, mediaType = null)
-                } else if (text.isNotBlank()) {
-                    repository.sendMessage(conversationId, text, isGroup)
-                }
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    error = e.message ?: "Erro ao enviar mensagem"
-                )
+            if (text.isNotBlank()) {
+                repository.sendMessage(conversationId, text, isGroup)
+                onTyping(conversationId, false)
             }
+        }
+    }
+
+    fun sendMediaMessage(conversationId: String, uri: Uri, type: String, isGroup: Boolean) {
+        viewModelScope.launch {
+            try { repository.sendMediaMessage(conversationId, uri, type, isGroup) } 
+            catch (e: Exception) { _uiState.value = _uiState.value.copy(error = e.message) }
         }
     }
 
@@ -196,8 +140,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                 }
-            } catch (e: SecurityPermissionException) {
-                 _uiState.value = _uiState.value.copy(error = "Permissão de localização negada")
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = "Falha ao obter localização")
             }
@@ -242,34 +184,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun sendSticker(conversationId: String, stickerId: String) {
         viewModelScope.launch {
-            val isGroup = _uiState.value.conversation?.isGroup ?: false
-            try {
-                repository.sendStickerMessage(conversationId, stickerId, isGroup)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    error = e.message ?: "Erro ao enviar sticker"
-                )
-            }
+            try { repository.sendStickerMessage(conversationId, stickerId, _uiState.value.conversation?.isGroup ?: false) }
+            catch (e: Exception) { _uiState.value = _uiState.value.copy(error = e.message) }
         }
     }
 
-    fun onReactionClick(conversationId: String, messageId: String, emoji: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val isGroup = _uiState.value.conversation?.isGroup ?: false
-            repository.toggleReaction(conversationId, messageId, emoji, isGroup)
-        }
-    }
-
-    fun onPinMessageClick(conversationId: String, message: Message) {
+    fun toggleBlockUser(conversationId: String) {
         viewModelScope.launch {
-            try {
-                val isGroup = _uiState.value.conversation?.isGroup ?: false
-                repository.togglePinMessage(conversationId, message, isGroup)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message ?: "Falha ao fixar mensagem")
+            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
+            val userIds = conversationId.split("-")
+            if (userIds.size == 2) {
+                val otherUserId = if (userIds[0] == currentUserId) userIds[1] else userIds[0]
+                repository.toggleBlockUser(otherUserId)
             }
         }
     }
-    
-    class SecurityPermissionException(message: String) : Exception(message)
 }

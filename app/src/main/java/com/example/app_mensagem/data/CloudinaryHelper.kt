@@ -11,40 +11,38 @@ import kotlin.coroutines.resumeWithException
 
 object CloudinaryHelper {
 
-    suspend fun uploadImage(uri: Uri): String {
+    suspend fun uploadFile(uri: Uri, type: String): String {
         return suspendCancellableCoroutine { continuation ->
-            Log.d("CloudinaryHelper", "Iniciando upload da imagem: $uri")
+            Log.d("CloudinaryHelper", "Iniciando upload ($type): $uri")
+            
+            // Cloudinary usa "video" para arquivos de áudio e vídeo
+            val resourceType = when(type) {
+                "VIDEO", "AUDIO" -> "video"
+                else -> "image"
+            }
             
             MediaManager.get().upload(uri)
-                .unsigned("meu_preset") // Certifique-se que este nome é EXATAMENTE igual ao do site
+                .unsigned("meu_preset")
+                .option("resource_type", resourceType)
                 .callback(object : UploadCallback {
-                    override fun onStart(requestId: String) {
-                        Log.d("CloudinaryHelper", "Upload iniciado...")
-                    }
-
-                    override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {
-                        val progress = (bytes.toDouble() / totalBytes * 100).toInt()
-                        Log.d("CloudinaryHelper", "Progresso: $progress%")
-                    }
+                    override fun onStart(requestId: String) {}
+                    override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {}
                     
                     override fun onSuccess(requestId: String, resultData: Map<*, *>) {
                         val url = resultData["secure_url"] as? String
-                        Log.d("CloudinaryHelper", "Upload concluído com sucesso! URL: $url")
                         if (url != null) {
                             continuation.resume(url)
                         } else {
-                            continuation.resumeWithException(Exception("URL segura não encontrada"))
+                            continuation.resumeWithException(Exception("URL não encontrada"))
                         }
                     }
 
                     override fun onError(requestId: String, error: ErrorInfo) {
-                        Log.e("CloudinaryHelper", "ERRO NO CLOUDINARY: ${error.description} (Código: ${error.code})")
+                        Log.e("CloudinaryHelper", "ERRO: ${error.description}")
                         continuation.resumeWithException(Exception(error.description))
                     }
 
-                    override fun onReschedule(requestId: String, error: ErrorInfo) {
-                        Log.d("CloudinaryHelper", "Upload reagendado")
-                    }
+                    override fun onReschedule(requestId: String, error: ErrorInfo) {}
                 })
                 .dispatch()
         }

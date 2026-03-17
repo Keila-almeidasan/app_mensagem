@@ -30,7 +30,7 @@ class AuthRepository {
             if (imageUri != null) {
                 try {
                     Log.d("AuthRepository", "Iniciando upload para Cloudinary...")
-                    imageUrl = CloudinaryHelper.uploadImage(imageUri)
+                    imageUrl = CloudinaryHelper.uploadFile(imageUri, "IMAGE")
                     Log.d("AuthRepository", "Upload concluído! URL: $imageUrl")
                 } catch (e: Exception) {
                     Log.e("AuthRepository", "FALHA NO UPLOAD: ${e.message}")

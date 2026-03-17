@@ -46,6 +46,10 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        // SOLUÇÃO PARA O ERRO DE 16 KB PAGE SIZE
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
@@ -73,7 +77,8 @@ dependencies {
     // Cloudinary
     implementation("com.cloudinary:cloudinary-android:3.0.2")
 
-    val room_version = "2.6.1"
+    // Room
+    val room_version = "2.7.0-alpha11" 
     implementation("androidx.room:room-runtime:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
     ksp("androidx.room:room-compiler:$room_version")

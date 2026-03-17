@@ -42,23 +42,13 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { }
 
-    private fun askNotificationPermission() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-    }
 
-    private fun handleIntent(intent: Intent?, navController: NavHostController) {
-        val conversationId = intent?.getStringExtra("conversationId")
-        if (conversationId != null) {
-            navController.navigate("chat/$conversationId")
-            intent.removeExtra("conversationId")
-        }
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        askNotificationPermission()
         setContent {
             App_mensagemTheme {
                 Surface(
@@ -72,52 +62,28 @@ class MainActivity : ComponentActivity() {
                     val profileViewModel: ProfileViewModel by viewModels()
                     val groupInfoViewModel: GroupInfoViewModel by viewModels()
 
-                    LaunchedEffect(key1 = this.intent) {
-                        handleIntent(intent, navController)
-                    }
-
                     val authState by authViewModel.uiState.collectAsState()
 
+                    // --- LOGICA DE SAÍDA (LOGOUT) ---
                     LaunchedEffect(authState) {
                         if (authState is AuthUiState.SignedOut) {
                             navController.navigate("login") {
+                                // Limpa todo o histórico de telas para o usuário não conseguir "voltar" para as mensagens
                                 popUpTo(0) { inclusive = true }
                             }
                             authViewModel.resetState()
                         }
                     }
 
-                    val startDestination = if (FirebaseAuth.getInstance().currentUser != null) {
-                        "home"
-                    } else {
-                        "login"
-                    }
+                    val startDestination = if (FirebaseAuth.getInstance().currentUser != null) "home" else "login"
 
                     NavHost(navController = navController, startDestination = startDestination) {
                         composable("login") { LoginScreen(navController, authViewModel) }
                         composable("signup") { SignUpScreen(navController, authViewModel) }
                         composable("home") { HomeScreen(navController, authViewModel, conversationsViewModel) }
                         composable("forgot_password") { ForgotPasswordScreen(navController, authViewModel) }
-                        composable(
-                            route = "contacts?selectionMode={selectionMode}",
-                            arguments = listOf(navArgument("selectionMode") {
-                                type = NavType.BoolType
-                                defaultValue = false
-                            })
-                        ) { backStackEntry ->
-                            val selectionMode = backStackEntry.arguments?.getBoolean("selectionMode") ?: false
-                            ContactsScreen(navController, contactsViewModel, selectionMode)
-                        }
+                        composable("contacts") { ContactsScreen(navController, contactsViewModel) }
                         composable("profile") { ProfileScreen(navController, profileViewModel) }
-                        composable(
-                            route = "create_group/{memberIdsJson}",
-                            arguments = listOf(navArgument("memberIdsJson") { type = NavType.StringType })
-                        ) { backStackEntry ->
-                            val memberIdsJson = backStackEntry.arguments?.getString("memberIdsJson")
-                            val type = object : TypeToken<List<String>>() {}.type
-                            val memberIds: List<String> = Gson().fromJson(memberIdsJson, type) ?: emptyList()
-                            CreateGroupScreen(navController, memberIds, contactsViewModel)
-                        }
                         composable(
                             route = "chat/{conversationId}",
                             arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
@@ -131,6 +97,15 @@ class MainActivity : ComponentActivity() {
                         ) { backStackEntry ->
                             val groupId = backStackEntry.arguments?.getString("groupId")
                             GroupInfoScreen(navController, groupId, groupInfoViewModel)
+                        }
+                        composable(
+                            route = "create_group/{memberIdsJson}",
+                            arguments = listOf(navArgument("memberIdsJson") { type = NavType.StringType })
+                        ) { backStackEntry ->
+                            val memberIdsJson = backStackEntry.arguments?.getString("memberIdsJson")
+                            val type = object : TypeToken<List<String>>() {}.type
+                            val memberIds: List<String> = Gson().fromJson(memberIdsJson, type) ?: emptyList()
+                            CreateGroupScreen(navController, memberIds, contactsViewModel)
                         }
                     }
                 }

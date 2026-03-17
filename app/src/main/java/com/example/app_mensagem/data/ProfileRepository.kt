@@ -27,7 +27,8 @@ class ProfileRepository {
         // Agora usando CloudinaryHelper para o Perfil também!
         if (imageUri != null) {
             try {
-                imageUrl = CloudinaryHelper.uploadImage(imageUri)
+                // Ajustado para usar uploadFile que suporta o tipo
+                imageUrl = CloudinaryHelper.uploadFile(imageUri, "IMAGE")
             } catch (e: Exception) {
                 Log.e("ProfileRepository", "Erro no upload Cloudinary: ${e.message}")
             }

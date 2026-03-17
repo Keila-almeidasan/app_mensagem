@@ -9,7 +9,7 @@ import com.example.app_mensagem.data.model.Conversation
 import com.example.app_mensagem.data.model.Message
 import com.example.app_mensagem.data.model.User
 
-@Database(entities = [User::class, Conversation::class, Message::class], version = 9, exportSchema = false)
+@Database(entities = [User::class, Conversation::class, Message::class], version = 11, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
 

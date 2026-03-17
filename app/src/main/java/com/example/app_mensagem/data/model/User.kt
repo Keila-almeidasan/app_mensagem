@@ -10,8 +10,10 @@ data class User(
     val email: String = "",
     val fcmToken: String = "",
     val profilePictureUrl: String? = null,
-    val status: String = "",
+    val status: String = "Disponível", // Ex: "Online", "Ocupado", "No trabalho"
+    val about: String = "", // Mais informações no perfil
     val blockedUsers: List<String> = emptyList(),
     val isOnline: Boolean = false,
-    val lastSeen: Long = 0L
+    val lastSeen: Long = 0L,
+    val lastSeenVisible: Boolean = true // Bloqueio de visto por último
 )

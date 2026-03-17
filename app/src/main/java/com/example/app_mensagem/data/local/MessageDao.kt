@@ -16,7 +16,9 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY timestamp ASC")
     fun getMessagesForConversation(conversationId: String): Flow<List<Message>>
 
-    // NOVA FUNÇÃO
+    @Query("SELECT * FROM messages WHERE conversationId = :conversationId AND content LIKE '%' || :query || '%' ORDER BY timestamp DESC")
+    fun searchMessages(conversationId: String, query: String): Flow<List<Message>>
+
     @Query("DELETE FROM messages")
     suspend fun clearAll()
 }

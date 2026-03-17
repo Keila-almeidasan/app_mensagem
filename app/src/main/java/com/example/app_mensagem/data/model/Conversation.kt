@@ -13,8 +13,8 @@ data class Conversation(
     val lastSenderId: String = "",
     val timestamp: Long = 0L,
     val pinnedMessageId: String? = null,
+    val isMuted: Boolean = false, // Silenciar notificações
 
-    // A anotação que garante a leitura/escrita correta do Firebase
     @get:PropertyName("isGroup")
     val isGroup: Boolean = false
 )

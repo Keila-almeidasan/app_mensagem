@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -42,12 +41,13 @@ import java.util.*
 fun HomeScreen(
     navController: NavController,
     authViewModel: AuthViewModel,
-    conversationsViewModel: ConversationsViewModel = viewModel()
+    conversationsViewModel: ConversationsViewModel = viewModel(),
+    isDarkMode: Boolean,
+    onToggleTheme: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val conversationState by conversationsViewModel.uiState.collectAsState()
 
-    // Pedir permissão de notificação (Android 13+)
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
@@ -69,7 +69,7 @@ fun HomeScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 tonalElevation = 8.dp,
-                color = Color.White
+                color = MaterialTheme.colorScheme.surface
             ) {
                 Row(
                     modifier = Modifier
@@ -83,17 +83,26 @@ fun HomeScreen(
                         "Mensagens",
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF1E293B)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Botão de Tema (Sol/Lua) movido para a Home
+                        IconButton(onClick = onToggleTheme) {
+                            Icon(
+                                imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                contentDescription = "Alternar Tema",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
                         IconButton(onClick = { navController.navigate("contacts") }) {
-                            Icon(Icons.Default.Search, null, tint = Color(0xFF64748B))
+                            Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         
                         Box {
                             IconButton(onClick = { showMenu = true }) {
-                                Icon(Icons.Default.MoreVert, null, tint = Color(0xFF64748B))
+                                Icon(Icons.Default.MoreVert, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             DropdownMenu(
                                 expanded = showMenu,
@@ -124,8 +133,8 @@ fun HomeScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { navController.navigate("contacts") },
-                containerColor = Color.White,
-                contentColor = Color(0xFF9333EA),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.padding(bottom = 16.dp, end = 8.dp)
             ) {
                 Icon(Icons.Default.Message, contentDescription = "Nova Conversa")
@@ -136,12 +145,12 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFFF8FAFC))
+                .background(MaterialTheme.colorScheme.background)
         ) {
             when (val state = conversationState) {
                 is ConversationUiState.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFF9333EA))
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 is ConversationUiState.Success -> {
@@ -184,7 +193,7 @@ fun ConversationItem(conversation: Conversation, onClick: () -> Unit) {
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFE2E8F0)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentScale = ContentScale.Crop
             )
         }
@@ -201,12 +210,12 @@ fun ConversationItem(conversation: Conversation, onClick: () -> Unit) {
                     text = conversation.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1E293B)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = formatTimestamp(conversation.timestamp),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF94A3B8)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
@@ -215,7 +224,7 @@ fun ConversationItem(conversation: Conversation, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = Color(0xFF64748B)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -232,14 +241,14 @@ fun EmptyConversationsState() {
             Icons.Default.Forum,
             contentDescription = null,
             modifier = Modifier.size(80.dp),
-            tint = Color(0xFFE2E8F0)
+            tint = MaterialTheme.colorScheme.surfaceVariant
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             "Nenhuma conversa ainda",
             fontSize = 18.sp,
             fontWeight = FontWeight.Medium,
-            color = Color(0xFF94A3B8)
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

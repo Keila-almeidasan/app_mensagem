@@ -87,7 +87,6 @@ fun HomeScreen(
                     )
                     
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Botão de Tema (Sol/Lua) movido para a Home
                         IconButton(onClick = onToggleTheme) {
                             Icon(
                                 imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
@@ -206,12 +205,23 @@ fun ConversationItem(conversation: Conversation, onClick: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = conversation.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = conversation.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (conversation.isMuted) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.NotificationsOff,
+                            contentDescription = "Silenciado",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                }
                 Text(
                     text = formatTimestamp(conversation.timestamp),
                     style = MaterialTheme.typography.bodySmall,

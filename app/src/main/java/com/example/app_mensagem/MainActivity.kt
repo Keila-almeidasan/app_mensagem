@@ -71,7 +71,19 @@ class MainActivity : ComponentActivity() {
                             HomeScreen(navController, authViewModel, conversationsViewModel, isDarkMode, toggleTheme) 
                         }
                         composable("profile") { ProfileScreen(navController, profileViewModel) }
-                        composable("contacts") { ContactsScreen(navController, contactsViewModel) }
+                        
+                        // CORREÇÃO: Rota de contatos agora suporta o parâmetro opcional selectionMode
+                        composable(
+                            route = "contacts?selectionMode={selectionMode}",
+                            arguments = listOf(navArgument("selectionMode") { 
+                                type = NavType.BoolType
+                                defaultValue = false 
+                            })
+                        ) { backStackEntry ->
+                            val selectionMode = backStackEntry.arguments?.getBoolean("selectionMode") ?: false
+                            ContactsScreen(navController, contactsViewModel, selectionMode)
+                        }
+
                         composable(
                             route = "chat/{conversationId}",
                             arguments = listOf(navArgument("conversationId") { type = NavType.StringType })

@@ -41,11 +41,11 @@ class ProfileViewModel : ViewModel() {
         }
     }
 
-    fun updateProfile(name: String, status: String, imageUri: Uri?) {
+    fun updateProfile(name: String, status: String, about: String, lastSeenVisible: Boolean, imageUri: Uri?) {
         viewModelScope.launch {
             try {
-                repository.updateProfile(name, status, imageUri)
-                loadUserProfile() // Recarrega para mostrar os dados atualizados
+                repository.updateProfile(name, status, about, lastSeenVisible, imageUri)
+                loadUserProfile()
             } catch (e: Exception) {
                 _uiState.value = ProfileUiState.Error(e.message ?: "Erro ao atualizar perfil.")
             }

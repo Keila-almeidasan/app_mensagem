@@ -51,17 +51,17 @@ fun GroupInfoScreen(
         }
     }
 
-    val selectedUserHandle = navController.currentBackStackEntry?.savedStateHandle
-    LaunchedEffect(selectedUserHandle) {
-        selectedUserHandle?.getLiveData<String>("selectedUserId")?.observeForever { userId ->
-            if (userId != null && groupId != null) {
-                // Evita adicionar membros que já existem
-                val isAlreadyMember = uiState.members.any { it.uid == userId }
-                if (!isAlreadyMember) {
-                    groupInfoViewModel.addMember(groupId, userId)
-                }
-                selectedUserHandle.remove<String>("selectedUserId")
+    // Listener para o retorno da tela de contatos
+    val backStackEntry = navController.currentBackStackEntry
+    val selectedUserId = backStackEntry?.savedStateHandle?.get<String>("selectedUserId")
+    
+    LaunchedEffect(selectedUserId) {
+        if (selectedUserId != null && groupId != null) {
+            val isAlreadyMember = uiState.members.any { it.uid == selectedUserId }
+            if (!isAlreadyMember) {
+                groupInfoViewModel.addMember(groupId, selectedUserId)
             }
+            backStackEntry.savedStateHandle.remove<String>("selectedUserId")
         }
     }
 
@@ -174,6 +174,7 @@ fun GroupInfoScreen(
                     if (uiState.group?.creatorId == currentUserId) {
                         TextButton(
                             onClick = {
+                                // CORREÇÃO: Navegando com selectionMode=true
                                 navController.navigate("contacts?selectionMode=true")
                             },
                             modifier = Modifier
@@ -186,7 +187,7 @@ fun GroupInfoScreen(
                         }
                     }
 
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     LazyColumn {
                         items(uiState.members) { member ->
                             MemberItem(
@@ -216,7 +217,6 @@ fun MemberItem(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Reutilizando UserItem, mas com lógica customizada
         Box(modifier = Modifier.weight(1f)) {
             UserItem(user = user, isSelected = false, onClick = {})
         }

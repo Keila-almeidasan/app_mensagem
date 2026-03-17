@@ -22,19 +22,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import com.example.app_mensagem.R
 import com.example.app_mensagem.data.model.User
 import com.example.app_mensagem.presentation.viewmodel.ContactNavigationState
 import com.example.app_mensagem.presentation.viewmodel.ContactsUiState
 import com.example.app_mensagem.presentation.viewmodel.ContactsViewModel
-import com.example.app_mensagem.ui.theme.App_mensagemTheme
 import com.google.gson.Gson
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,7 +46,6 @@ fun ContactsScreen(
     val selectedUsers = remember { mutableStateListOf<User>() }
     val context = LocalContext.current
 
-    // Launcher para pedir permissão de contatos
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -71,7 +67,7 @@ fun ContactsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (selectionMode) "Adicionar Membro" else if (selectedUsers.isEmpty()) "Contatos" else "${selectedUsers.size} selecionados") },
+                title = { Text(if (selectionMode) "Selecionar Participante" else "Contatos") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
@@ -89,7 +85,7 @@ fun ContactsScreen(
                         navController.navigate("create_group/$userIdsJson")
                     }
                 }) {
-                    Icon(Icons.Default.Check, contentDescription = "Confirmar seleção")
+                    Icon(Icons.Default.Check, contentDescription = "Confirmar")
                 }
             }
         }
@@ -105,22 +101,22 @@ fun ContactsScreen(
                 }
                 is ContactsUiState.Success -> {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        TextButton(
-                            onClick = {
-                                when (PackageManager.PERMISSION_GRANTED) {
-                                    ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) -> {
+                        if (!selectionMode) {
+                            TextButton(
+                                onClick = {
+                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
                                         contactsViewModel.importContacts()
-                                    }
-                                    else -> {
+                                    } else {
                                         permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
                                     }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().padding(8.dp)
-                        ) {
-                            Text("Importar da Agenda do Celular")
+                                },
+                                modifier = Modifier.fillMaxWidth().padding(8.dp)
+                            ) {
+                                Text("Importar da Agenda")
+                            }
+                            HorizontalDivider()
                         }
-                        HorizontalDivider()
+                        
                         LazyColumn(modifier = Modifier.weight(1f)) {
                             items(state.users) { user ->
                                 val isSelected = selectedUsers.any { it.uid == user.uid }
@@ -129,6 +125,7 @@ fun ContactsScreen(
                                     isSelected = isSelected,
                                     onClick = {
                                         if (selectionMode) {
+                                            // Se for modo de seleção (adicionando participante), volta com o ID
                                             navController.previousBackStackEntry
                                                 ?.savedStateHandle
                                                 ?.set("selectedUserId", user.uid)
@@ -147,10 +144,7 @@ fun ContactsScreen(
                     }
                 }
                 is ContactsUiState.Error -> {
-                    Text(
-                        text = "Erro: ${state.message}",
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                    Text(text = "Erro: ${state.message}", modifier = Modifier.align(Alignment.Center))
                 }
             }
         }
@@ -173,25 +167,14 @@ fun UserItem(
     ) {
         AsyncImage(
             model = user.profilePictureUrl ?: R.drawable.ic_launcher_foreground,
-            contentDescription = "Foto de Perfil de ${user.name}",
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape),
+            contentDescription = null,
+            modifier = Modifier.size(48.dp).clip(CircleShape),
             contentScale = ContentScale.Crop
         )
         Spacer(modifier = Modifier.width(16.dp))
         Column {
             Text(user.name, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(user.email, style = MaterialTheme.typography.bodySmall)
+            Text(user.status, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun ContactsScreenPreview() {
-    App_mensagemTheme {
-        ContactsScreen(navController = rememberNavController())
     }
 }

@@ -22,8 +22,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
+import java.util.*
 
 data class ChatUiState(
     val chatItems: List<ChatItem> = emptyList(),
@@ -35,9 +34,6 @@ data class ChatUiState(
     val pinnedMessage: Message? = null,
     val isLoading: Boolean = true,
     val error: String? = null,
-    val mediaToSendUri: Uri? = null,
-    val mediaType: String? = null,
-    val groupMembers: Map<String, User> = emptyMap(),
     val isRecording: Boolean = false,
     val isUserBlocked: Boolean = false,
     val isContactTyping: Boolean = false,
@@ -59,10 +55,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         repository = ChatRepository(db.conversationDao(), db.messageDao(), application)
         repository.setUserPresence()
         
-        // Carrega a configuração de privacidade atual
         viewModelScope.launch {
             val visible = repository.getLastSeenVisibility()
             _uiState.value = _uiState.value.copy(isLastSeenVisible = visible)
+        }
+    }
+
+    fun toggleMute(conversationId: String) {
+        viewModelScope.launch {
+            val currentMuteStatus = _uiState.value.conversation?.isMuted ?: false
+            repository.toggleMuteConversation(conversationId, !currentMuteStatus)
+            val updatedConv = repository.getConversationDetails(conversationId)
+            _uiState.value = _uiState.value.copy(conversation = updatedConv)
         }
     }
 
@@ -74,6 +78,26 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun searchMessages(conversationId: String, query: String, isDateSearch: Boolean = false) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+        viewModelScope.launch {
+            if (query.isEmpty()) {
+                _uiState.value = _uiState.value.copy(filteredMessages = _uiState.value.messages)
+            } else if (isDateSearch) {
+                // Filtro por data em memória para precisão total
+                val filtered = _uiState.value.messages.filter { msg ->
+                    val dateStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(msg.timestamp))
+                    dateStr.contains(query)
+                }
+                _uiState.value = _uiState.value.copy(filteredMessages = filtered)
+            } else {
+                repository.searchMessages(conversationId, query).collect { filtered ->
+                    _uiState.value = _uiState.value.copy(filteredMessages = filtered)
+                }
+            }
+        }
+    }
+
     fun onTyping(conversationId: String, isTyping: Boolean) {
         repository.setTypingStatus(conversationId, isTyping)
     }
@@ -81,7 +105,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun loadMessages(conversationId: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
-
             val conversation = repository.getConversationDetails(conversationId)
             if (conversation == null) {
                 _uiState.value = _uiState.value.copy(error = "Conversa não encontrada.", isLoading = false)
@@ -89,7 +112,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             viewModelScope.launch {
-                repository.observeTypingStatus(conversationId).collect { typingUsers: List<String> ->
+                repository.observeTypingStatus(conversationId).collect { typingUsers ->
                     _uiState.value = _uiState.value.copy(isContactTyping = typingUsers.isNotEmpty())
                 }
             }
@@ -99,16 +122,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val userIds = conversationId.split("-")
                 if (userIds.size == 2 && currentUserId != null) {
                     val otherUserId = if (userIds[0] == currentUserId) userIds[1] else userIds[0]
-                    
                     viewModelScope.launch {
                         repository.observeUserPresence(otherUserId).collect { (isOnline, lastSeen, lastSeenVisible) ->
                             val statusText = if (isOnline) "Online" 
                                             else if (lastSeenVisible) "Visto por último às ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(lastSeen)}"
                                             else "Offline"
-                            _uiState.value = _uiState.value.copy(
-                                contactPresence = statusText,
-                                isUserBlocked = repository.isUserBlocked(currentUserId, otherUserId)
-                            )
+                            _uiState.value = _uiState.value.copy(contactPresence = statusText, isUserBlocked = repository.isUserBlocked(currentUserId, otherUserId))
                         }
                     }
                 }
@@ -116,40 +135,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
             val pinnedMessage = if (conversation.pinnedMessageId != null) {
                 repository.getMessageById(conversationId, conversation.pinnedMessageId!!, conversation.isGroup)
-            } else {
-                null
-            }
+            } else null
 
-            _uiState.value = _uiState.value.copy(
-                conversationTitle = conversation.name,
-                conversation = conversation,
-                pinnedMessage = pinnedMessage
-            )
+            _uiState.value = _uiState.value.copy(conversationTitle = conversation.name, conversation = conversation, pinnedMessage = pinnedMessage)
 
             repository.getMessagesForConversation(conversationId, conversation.isGroup)
                 .catch { _uiState.value = _uiState.value.copy(error = it.message, isLoading = false) }
                 .collect { messages ->
-                    _uiState.value = _uiState.value.copy(
-                        messages = messages, 
-                        filteredMessages = if (_uiState.value.searchQuery.isEmpty()) messages else _uiState.value.filteredMessages,
-                        isLoading = false
-                    )
-                    // MARCAR COMO LIDO ao receber novas mensagens na tela aberta
+                    _uiState.value = _uiState.value.copy(messages = messages, filteredMessages = if (_uiState.value.searchQuery.isEmpty()) messages else _uiState.value.filteredMessages, isLoading = false)
                     repository.markMessagesAsRead(conversationId, messages, conversation.isGroup)
                 }
-        }
-    }
-
-    fun searchMessages(conversationId: String, query: String) {
-        _uiState.value = _uiState.value.copy(searchQuery = query)
-        viewModelScope.launch {
-            if (query.isEmpty()) {
-                _uiState.value = _uiState.value.copy(filteredMessages = _uiState.value.messages)
-            } else {
-                repository.searchMessages(conversationId, query).collect { filtered ->
-                    _uiState.value = _uiState.value.copy(filteredMessages = filtered)
-                }
-            }
         }
     }
 
@@ -161,9 +156,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val conversation = repository.getConversationDetails(conversationId)
                 val pinnedMessage = if (conversation?.pinnedMessageId != null) {
                     repository.getMessageById(conversationId, conversation.pinnedMessageId!!, conversation.isGroup)
-                } else {
-                    null
-                }
+                } else null
                 _uiState.value = _uiState.value.copy(pinnedMessage = pinnedMessage)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message ?: "Falha ao fixar mensagem")
@@ -238,7 +231,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
             mediaRecorder = null
             _uiState.value = _uiState.value.copy(isRecording = false)
-
             audioFile?.let { file ->
                 viewModelScope.launch {
                     repository.sendMediaMessage(conversationId, Uri.fromFile(file), "AUDIO", _uiState.value.conversation?.isGroup ?: false)

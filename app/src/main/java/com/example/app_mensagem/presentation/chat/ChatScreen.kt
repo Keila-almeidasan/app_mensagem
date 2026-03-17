@@ -52,6 +52,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
+enum class SearchMode { TEXT, DATE }
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ChatScreen(
@@ -69,6 +71,7 @@ fun ChatScreen(
     var showAttachmentMenu by remember { mutableStateOf(false) }
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var searchMode by remember { mutableStateOf(SearchMode.TEXT) }
     
     val context = LocalContext.current
     var fullscreenImageUrl by remember { mutableStateOf<String?>(null) }
@@ -136,19 +139,39 @@ fun ChatScreen(
             Surface(modifier = Modifier.fillMaxWidth(), tonalElevation = 4.dp, color = MaterialTheme.colorScheme.surface) {
                 Column {
                     AnimatedVisibility(visible = isSearching) {
-                        Row(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { 
-                                isSearching = false
-                                searchQuery = ""
-                                if (conversationId != null) chatViewModel.searchMessages(conversationId, "")
-                            }) { Icon(Icons.Default.Close, null) }
-                            TextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it; if (conversationId != null) chatViewModel.searchMessages(conversationId, it) },
-                                modifier = Modifier.weight(1f),
-                                placeholder = { Text("Pesquisar...") },
-                                colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent)
-                            )
+                        Column {
+                            Row(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = { 
+                                    isSearching = false
+                                    searchQuery = ""
+                                    if (conversationId != null) chatViewModel.searchMessages(conversationId, "")
+                                }) { Icon(Icons.Default.Close, null) }
+                                TextField(
+                                    value = searchQuery,
+                                    onValueChange = { 
+                                        searchQuery = it
+                                        if (conversationId != null) chatViewModel.searchMessages(conversationId, it, searchMode == SearchMode.DATE) 
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    placeholder = { 
+                                        Text(if (searchMode == SearchMode.TEXT) "Pesquisar mensagem..." else "Data (dd/mm/yyyy hh:mm)...") 
+                                    },
+                                    colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent)
+                                )
+                            }
+                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.Center) {
+                                FilterChip(
+                                    selected = searchMode == SearchMode.TEXT,
+                                    onClick = { searchMode = SearchMode.TEXT; if (conversationId != null) chatViewModel.searchMessages(conversationId, searchQuery, false) },
+                                    label = { Text("Texto") }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                FilterChip(
+                                    selected = searchMode == SearchMode.DATE,
+                                    onClick = { searchMode = SearchMode.DATE; if (conversationId != null) chatViewModel.searchMessages(conversationId, searchQuery, true) },
+                                    label = { Text("Data/Hora") }
+                                )
+                            }
                         }
                     }
 
@@ -163,13 +186,16 @@ fun ChatScreen(
                                 AsyncImage(
                                     model = uiState.conversation?.profilePictureUrl ?: R.drawable.ic_launcher_foreground,
                                     contentDescription = null,
-                                    modifier = Modifier.size(42.dp).clip(CircleShape).background(Color.LightGray).clickable { fullscreenImageUrl = uiState.conversation?.profilePictureUrl },
+                                    modifier = Modifier.size(42.dp).clip(CircleShape).background(Color.LightGray).clickable { 
+                                        if (uiState.conversation?.isGroup == true) navController.navigate("group_info/${uiState.conversation?.id}")
+                                        else fullscreenImageUrl = uiState.conversation?.profilePictureUrl 
+                                    },
                                     contentScale = ContentScale.Crop
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(uiState.conversationTitle, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                                    Text(uiState.contactPresence, fontSize = 12.sp, color = Color(0xFF10B981))
+                                    Text(uiState.contactPresence, fontSize = 12.sp, color = if (uiState.contactPresence == "Online") Color(0xFF10B981) else Color.Gray)
                                 }
                             }
                             
@@ -185,6 +211,14 @@ fun ChatScreen(
                                         onClick = { showMenu = false; isSearching = true }
                                     )
                                     DropdownMenuItem(
+                                        text = { Text(if (uiState.conversation?.isMuted == true) "Ativar Som" else "Silenciar") },
+                                        leadingIcon = { Icon(if (uiState.conversation?.isMuted == true) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff, null) },
+                                        onClick = { 
+                                            showMenu = false
+                                            if (conversationId != null) chatViewModel.toggleMute(conversationId)
+                                        }
+                                    )
+                                    DropdownMenuItem(
                                         text = { Text(if (uiState.isLastSeenVisible) "Ocultar Visto por Último" else "Mostrar Visto por Último") },
                                         leadingIcon = { Icon(if (uiState.isLastSeenVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, null) },
                                         onClick = { 
@@ -192,11 +226,16 @@ fun ChatScreen(
                                             chatViewModel.toggleLastSeen()
                                         }
                                     )
-                                    DropdownMenuItem(
-                                        text = { Text("Limpar Chat") },
-                                        leadingIcon = { Icon(Icons.Default.Delete, null) },
-                                        onClick = { showMenu = false }
-                                    )
+                                    if (uiState.conversation?.isGroup == true) {
+                                        DropdownMenuItem(
+                                            text = { Text("Dados do Grupo") },
+                                            leadingIcon = { Icon(Icons.Default.Info, null) },
+                                            onClick = { 
+                                                showMenu = false
+                                                navController.navigate("group_info/${uiState.conversation?.id}")
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -221,23 +260,40 @@ fun ChatScreen(
                 }
             }
 
-            // --- MENSAGENS ---
+            // --- MENSAGENS COM AGRUPAMENTO POR DATA ---
             LazyColumn(
                 state = listState, 
                 modifier = Modifier.weight(1f).fillMaxWidth(), 
                 contentPadding = PaddingValues(16.dp), 
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                val displayMessages = if (isSearching) uiState.filteredMessages else uiState.messages
-                items(displayMessages) { message ->
-                    val isMine = message.senderId == currentUserId
-                    MessageBubbleDesign(
-                        message = message, 
-                        isMine = isMine,
-                        isPinned = uiState.pinnedMessage?.id == message.id,
-                        onImageClick = { fullscreenImageUrl = it },
-                        onPinClick = { if (conversationId != null) chatViewModel.onPinMessageClick(conversationId, it) }
-                    )
+                val messages = if (isSearching) uiState.filteredMessages else uiState.messages
+                
+                val groupedMessages = messages.groupBy { 
+                    SimpleDateFormat("dd 'de' MMMM 'de' yyyy", Locale("pt", "BR")).format(Date(it.timestamp))
+                }
+
+                groupedMessages.forEach { (date, msgs) ->
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(date, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    items(msgs) { message ->
+                        val isMine = message.senderId == currentUserId
+                        MessageBubbleDesign(
+                            message = message, 
+                            isMine = isMine,
+                            isPinned = uiState.pinnedMessage?.id == message.id,
+                            onImageClick = { fullscreenImageUrl = it },
+                            onPinClick = { if (conversationId != null) chatViewModel.onPinMessageClick(conversationId, it) }
+                        )
+                    }
                 }
             }
 

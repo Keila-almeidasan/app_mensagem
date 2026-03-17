@@ -19,24 +19,24 @@ class ProfileRepository {
         return snapshot.getValue(User::class.java)
     }
 
-    suspend fun updateProfile(name: String, status: String, imageUri: Uri?) {
+    suspend fun updateProfile(name: String, status: String, about: String, lastSeenVisible: Boolean, imageUri: Uri?) {
         val userId = auth.currentUser?.uid ?: return
         val userRef = database.getReference("users").child(userId)
         var imageUrl: String? = null
 
-        // Agora usando CloudinaryHelper para o Perfil também!
         if (imageUri != null) {
             try {
-                // Ajustado para usar uploadFile que suporta o tipo
                 imageUrl = CloudinaryHelper.uploadFile(imageUri, "IMAGE")
             } catch (e: Exception) {
-                Log.e("ProfileRepository", "Erro no upload Cloudinary: ${e.message}")
+                Log.e("ProfileRepository", "Erro no upload: ${e.message}")
             }
         }
 
         val updates = mutableMapOf<String, Any?>()
         updates["name"] = name
         updates["status"] = status
+        updates["about"] = about
+        updates["lastSeenVisible"] = lastSeenVisible
         
         if (imageUrl != null) {
             updates["profilePictureUrl"] = imageUrl
